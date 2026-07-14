@@ -4,68 +4,75 @@ import { InkCapture, recognizeInk } from "./ink.js";
 import { createMeteorSystem } from "./meteors.js";
 
 
-const STROKE_PRESETS = [
+/** 太さ（線の幅・筆圧まわり） */
+const STROKE_WIDTHS = [
   {
-    id: "fine-ya",
-    label: "細・やや長め",
-    desc: "細い線 / 少し残る",
-    splatRadius: 0.030,
-    densityDissipation: 0.942,
-    velocityDissipation: 0.89,
-    splatForce: 1100,
-    dyeGain: 0.13,
-    moveForce: 0.14,
+    id: "fine",
+    label: "細",
+    splatRadius: 0.031,
+    splatForce: 1150,
+    dyeGain: 0.135,
+    moveForce: 0.145,
     step: 0.007,
   },
   {
-    id: "fine-long",
-    label: "細・長め",
-    desc: "細い線 / 長く残る",
-    splatRadius: 0.032,
-    densityDissipation: 0.972,
-    velocityDissipation: 0.90,
-    splatForce: 1200,
-    dyeGain: 0.14,
-    moveForce: 0.15,
-    step: 0.007,
-  },
-  {
-    id: "std-ya",
-    label: "標準・やや長め",
-    desc: "標準の太さ / 少し残る",
-    splatRadius: 0.054,
-    densityDissipation: 0.952,
-    velocityDissipation: 0.90,
-    splatForce: 1700,
-    dyeGain: 0.17,
-    moveForce: 0.20,
+    id: "std",
+    label: "標準",
+    splatRadius: 0.055,
+    splatForce: 1725,
+    dyeGain: 0.175,
+    moveForce: 0.205,
     step: 0.008,
   },
   {
-    id: "midbold-ya",
-    label: "中太・やや長め",
-    desc: "中太 / 少し残る",
+    id: "midbold",
+    label: "中太",
     splatRadius: 0.086,
-    densityDissipation: 0.962,
-    velocityDissipation: 0.91,
     splatForce: 1900,
     dyeGain: 0.21,
     moveForce: 0.23,
     step: 0.009,
   },
+];
+
+/** 消える時間（残る長さ） */
+const STROKE_FADES = [
   {
-    id: "std-long",
-    label: "標準・長め",
-    desc: "標準の太さ / 長く残る",
-    splatRadius: 0.056,
+    id: "short",
+    label: "短め",
+    densityDissipation: 0.915,
+    velocityDissipation: 0.88,
+  },
+  {
+    id: "mid",
+    label: "やや長め",
+    densityDissipation: 0.952,
+    velocityDissipation: 0.90,
+  },
+  {
+    id: "long",
+    label: "長め",
     densityDissipation: 0.984,
     velocityDissipation: 0.91,
-    splatForce: 1750,
-    dyeGain: 0.18,
-    moveForce: 0.21,
-    step: 0.0085,
   },
 ];
+
+function composeStroke(width, fade) {
+  return {
+    id: `${width.id}-${fade.id}`,
+    label: `${width.label} / ${fade.label}`,
+    desc: `太さ: ${width.label} / 消え方: ${fade.label}`,
+    splatRadius: width.splatRadius,
+    splatForce: width.splatForce,
+    dyeGain: width.dyeGain,
+    moveForce: width.moveForce,
+    step: width.step,
+    densityDissipation: fade.densityDissipation,
+    velocityDissipation: fade.velocityDissipation,
+    widthId: width.id,
+    fadeId: fade.id,
+  };
+}
 
 const PALETTES = [
   {
@@ -103,7 +110,9 @@ const paletteEl = document.getElementById("palette");
 const pointers = new Map();
 let sim;
 let activePalette = PALETTES[0];
-let activeStroke = STROKE_PRESETS[2]; // 標準・やや長め
+let activeWidth = STROKE_WIDTHS[1]; // 標準
+let activeFade = STROKE_FADES[1]; // やや長め
+let activeStroke = composeStroke(activeWidth, activeFade);
 let stars = [];
 let last = performance.now();
 let ambientTimer = 0;
@@ -485,56 +494,64 @@ function onUp(id) {
 }
 
 
-function applyStrokePreset(preset, { flash = true } = {}) {
-  activeStroke = preset;
+function applyStrokeSettings({ flash = true } = {}) {
+  activeStroke = composeStroke(activeWidth, activeFade);
   if (!sim) return;
-  sim.config.splatRadius = preset.splatRadius;
-  sim.config.densityDissipation = preset.densityDissipation;
-  sim.config.velocityDissipation = preset.velocityDissipation;
-  sim.config.splatForce = preset.splatForce;
-  sim.config.dyeGain = preset.dyeGain;
+  sim.config.splatRadius = activeStroke.splatRadius;
+  sim.config.densityDissipation = activeStroke.densityDissipation;
+  sim.config.velocityDissipation = activeStroke.velocityDissipation;
+  sim.config.splatForce = activeStroke.splatForce;
+  sim.config.dyeGain = activeStroke.dyeGain;
   sim.config.curl = 3;
-  document.querySelectorAll(".stroke-chip").forEach((el) => {
-    el.classList.toggle("active", el.dataset.strokeId === preset.id);
+
+  document.querySelectorAll("#stroke-width .stroke-chip").forEach((el) => {
+    el.classList.toggle("active", el.dataset.widthId === activeWidth.id);
   });
+  document.querySelectorAll("#stroke-fade .stroke-chip").forEach((el) => {
+    el.classList.toggle("active", el.dataset.fadeId === activeFade.id);
+  });
+
   const foot = document.getElementById("settings-foot");
   if (foot) {
-    foot.textContent = `筆跡: ${preset.label}（${preset.desc}）`;
+    foot.textContent = `筆跡: ${activeWidth.label} / ${activeFade.label}`;
   }
   if (flash) {
     const { w, h } = viewSize();
-    // 小さな確認波紋
-    createCosmicRipple(
-      w * 0.5,
-      h * 0.62,
-      90,
-      2.4,
-      195,
-      0.55
-    );
+    createCosmicRipple(w * 0.5, h * 0.62, 90, 2.4, 195, 0.55);
   }
 }
 
-function buildStrokeUI() {
-  const el = document.getElementById("stroke-presets");
+function buildChipGroup(containerId, items, key, getActiveId, onPick) {
+  const el = document.getElementById(containerId);
   if (!el) return;
   el.replaceChildren();
-  STROKE_PRESETS.forEach((preset, idx) => {
+  items.forEach((item) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "stroke-chip" + (preset.id === activeStroke.id ? " active" : "");
-    btn.dataset.strokeId = preset.id;
-    btn.innerHTML = `${preset.label}<small>${preset.desc}</small>`;
-    btn.setAttribute("aria-label", `${preset.label} ${preset.desc}`);
+    btn.className = "stroke-chip" + (item.id === getActiveId() ? " active" : "");
+    btn.dataset[key] = item.id;
+    btn.textContent = item.label;
+    btn.setAttribute("aria-label", item.label);
     btn.addEventListener(
       "click",
       (e) => {
         e.stopPropagation();
-        applyStrokePreset(preset);
+        onPick(item);
       },
       true
     );
     el.appendChild(btn);
+  });
+}
+
+function buildStrokeUI() {
+  buildChipGroup("stroke-width", STROKE_WIDTHS, "widthId", () => activeWidth.id, (item) => {
+    activeWidth = item;
+    applyStrokeSettings();
+  });
+  buildChipGroup("stroke-fade", STROKE_FADES, "fadeId", () => activeFade.id, (item) => {
+    activeFade = item;
+    applyStrokeSettings();
   });
 }
 
@@ -715,7 +732,7 @@ function boot() {
   }
   buildPaletteUI();
   buildStrokeUI();
-  applyStrokePreset(activeStroke, { flash: false });
+  applyStrokeSettings({ flash: false });
   bindChromeUI();
   bindInput();
   installViewportLock();

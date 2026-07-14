@@ -261,6 +261,12 @@ body {
   gap: 5px;
 }
 
+.stroke-presets.stroke-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .stroke-chip {
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(8, 4, 20, 0.45);
@@ -274,8 +280,9 @@ body {
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
   white-space: nowrap;
-  text-align: left;
-  width: 100%;
+  text-align: center;
+  flex: 1 1 auto;
+  min-width: 4.5rem;
 }
 
 .stroke-chip:hover {
@@ -288,15 +295,6 @@ body {
   border-color: rgba(174, 230, 255, 0.7);
   background: rgba(110, 243, 255, 0.12);
   box-shadow: 0 0 16px rgba(110, 243, 255, 0.18);
-}
-
-.stroke-chip small {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.55rem;
-  letter-spacing: 0.03em;
-  opacity: 0.55;
-  font-weight: 400;
 }
 
 .settings-foot {

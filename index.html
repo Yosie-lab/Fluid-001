@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Nunito:wght@300;400;500&family=Shippori+Mincho:wght@400;500&family=Zen+Maru+Gothic:wght@300;400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=23" />
+  <link rel="stylesheet" href="styles.css?v=24" />
 </head>
 <body>
   <canvas id="fluid" aria-hidden="true"></canvas>
@@ -42,15 +42,19 @@
       <div class="palette" id="palette" role="group" aria-label="Color palettes"></div>
     </section>
     <section class="settings-section">
-      <p class="settings-label">Stroke</p>
-      <div class="stroke-presets" id="stroke-presets" role="group" aria-label="Stroke presets"></div>
+      <p class="settings-label">太さ</p>
+      <div class="stroke-presets stroke-row" id="stroke-width" role="group" aria-label="線の太さ"></div>
     </section>
-    <p class="settings-foot" id="settings-foot">筆跡: 標準・やや長め</p>
+    <section class="settings-section">
+      <p class="settings-label">消える時間</p>
+      <div class="stroke-presets stroke-row" id="stroke-fade" role="group" aria-label="消える時間"></div>
+    </section>
+    <p class="settings-foot" id="settings-foot">筆跡: 標準 / やや長め</p>
   </aside>
 
   <div id="touch-layer" aria-hidden="true"></div>
   <div id="pos-toast" class="pos-toast" hidden aria-live="polite"></div>
 
-  <script type="module" src="js/main.js?v=23"></script>
+  <script type="module" src="js/main.js?v=24"></script>
 </body>
 </html>
