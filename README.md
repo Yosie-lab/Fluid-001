@@ -7,6 +7,15 @@
 
 ---
 
+## どこからでも遊ぶ（iPhone）
+
+公開 URL（GitHub Pages）:
+
+**https://yosie-lab.github.io/Fluid-001/**
+
+iPhone の Safari で上のリンクを開き、そのまま指で書けます。  
+ホーム画面に追加すると、アプリのように全画面で開けます。
+
 ## 起動方法
 
 ```bash
