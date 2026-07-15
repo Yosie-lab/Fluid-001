@@ -76,9 +76,9 @@ const STROKE_FADES = [
   {
     id: "xlong",
     label: "超長め",
-    // 長めの約2倍残る（dissipation^n の時間スケール）
-    densityDissipation: 0.992,
-    velocityDissipation: 0.954,
+    // 長めの約4倍残る（前回の超長めからさらに約2倍）
+    densityDissipation: 0.996,
+    velocityDissipation: 0.977,
   },
 ];
 
