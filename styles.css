@@ -255,46 +255,63 @@ body {
   flex-wrap: wrap;
 }
 
-.stroke-presets {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.stroke-slider {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  touch-action: none;
 }
 
-.stroke-presets.stroke-row {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.stroke-chip {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(8, 4, 20, 0.45);
-  color: rgba(230, 225, 255, 0.78);
-  font-family: var(--font-ui);
-  font-size: 0.64rem;
-  font-weight: 400;
-  letter-spacing: 0.05em;
-  padding: 8px 12px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+.stroke-slider-edge {
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: rgba(190, 185, 230, 0.55);
   white-space: nowrap;
-  text-align: center;
-  flex: 1 1 auto;
-  min-width: 4.5rem;
 }
 
-.stroke-chip:hover {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.35);
+.stroke-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
 }
 
-.stroke-chip.active {
-  color: #f4f0ff;
-  border-color: rgba(174, 230, 255, 0.7);
-  background: rgba(110, 243, 255, 0.12);
-  box-shadow: 0 0 16px rgba(110, 243, 255, 0.18);
+.stroke-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(110, 243, 255, 0.18), rgba(255, 106, 213, 0.28));
+}
+
+.stroke-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(244, 240, 255, 0.95);
+  box-shadow: 0 0 12px rgba(110, 243, 255, 0.35);
+}
+
+.stroke-slider input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(110, 243, 255, 0.18), rgba(255, 106, 213, 0.28));
+}
+
+.stroke-slider input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(244, 240, 255, 0.95);
+  box-shadow: 0 0 12px rgba(110, 243, 255, 0.35);
 }
 
 .settings-foot {

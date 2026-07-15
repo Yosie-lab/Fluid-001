@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Nunito:wght@300;400;500&family=Shippori+Mincho:wght@400;500&family=Zen+Maru+Gothic:wght@300;400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=31" />
+  <link rel="stylesheet" href="styles.css?v=32" />
 </head>
 <body>
   <canvas id="fluid" aria-hidden="true"></canvas>
@@ -43,18 +43,26 @@
     </section>
     <section class="settings-section">
       <p class="settings-label">太さ</p>
-      <div class="stroke-presets stroke-row" id="stroke-width" role="group" aria-label="線の太さ"></div>
+      <div class="stroke-slider">
+        <span class="stroke-slider-edge">細い</span>
+        <input type="range" id="stroke-width-slider" min="0" max="100" step="1" value="75" aria-label="太さ：細いから太い" />
+        <span class="stroke-slider-edge">太い</span>
+      </div>
     </section>
     <section class="settings-section">
       <p class="settings-label">消える時間</p>
-      <div class="stroke-presets stroke-row" id="stroke-fade" role="group" aria-label="消える時間"></div>
+      <div class="stroke-slider">
+        <span class="stroke-slider-edge">短い</span>
+        <input type="range" id="stroke-fade-slider" min="0" max="100" step="1" value="33" aria-label="消える時間：短いから長い" />
+        <span class="stroke-slider-edge">長い</span>
+      </div>
     </section>
-    <p class="settings-foot" id="settings-foot">筆跡: 標準 / やや長め</p>
+    <p class="settings-foot" id="settings-foot">筆跡: 太さ・長さを調整</p>
   </aside>
 
   <div id="touch-layer" aria-hidden="true"></div>
   <div id="pos-toast" class="pos-toast" hidden aria-live="polite"></div>
 
-  <script type="module" src="js/main.js?v=31"></script>
+  <script type="module" src="js/main.js?v=32"></script>
 </body>
 </html>

@@ -4,98 +4,60 @@ import { InkCapture, recognizeInk } from "./ink.js";
 import { createMeteorSystem } from "./meteors.js";
 
 
-/** 太さ（線の幅・筆圧まわり） */
-const STROKE_WIDTHS = [
-  {
-    id: "hairline",
-    label: "超極細",
-    splatRadius: 0.0045,
-    splatForce: 225,
-    dyeGain: 0.025,
-    moveForce: 0.028,
-    step: 0.0014,
-  },
-  {
-    id: "extrafine",
-    label: "極細",
-    splatRadius: 0.018,
-    splatForce: 900,
-    dyeGain: 0.10,
-    moveForce: 0.11,
-    step: 0.0055,
-  },
-  {
-    id: "fine",
-    label: "細",
-    splatRadius: 0.031,
-    splatForce: 1150,
-    dyeGain: 0.135,
-    moveForce: 0.145,
-    step: 0.007,
-  },
-  {
-    id: "std",
-    label: "標準",
-    splatRadius: 0.055,
-    splatForce: 1725,
-    dyeGain: 0.175,
-    moveForce: 0.205,
-    step: 0.008,
-  },
-  {
-    id: "midbold",
-    label: "中太",
-    splatRadius: 0.086,
-    splatForce: 1900,
-    dyeGain: 0.21,
-    moveForce: 0.23,
-    step: 0.009,
-  },
+/** 太さの端点（超極細 → 中太）。スライダーで連続補間 */
+const STROKE_WIDTH_STOPS = [
+  { splatRadius: 0.0045, splatForce: 225, dyeGain: 0.025, moveForce: 0.028, step: 0.0014 },
+  { splatRadius: 0.018, splatForce: 900, dyeGain: 0.10, moveForce: 0.11, step: 0.0055 },
+  { splatRadius: 0.031, splatForce: 1150, dyeGain: 0.135, moveForce: 0.145, step: 0.007 },
+  { splatRadius: 0.055, splatForce: 1725, dyeGain: 0.175, moveForce: 0.205, step: 0.008 },
+  { splatRadius: 0.086, splatForce: 1900, dyeGain: 0.21, moveForce: 0.23, step: 0.009 },
 ];
 
-/** 消える時間（残る長さ） */
-const STROKE_FADES = [
-  {
-    id: "short",
-    label: "短め",
-    densityDissipation: 0.915,
-    velocityDissipation: 0.88,
-  },
-  {
-    id: "mid",
-    label: "やや長め",
-    densityDissipation: 0.952,
-    velocityDissipation: 0.90,
-  },
-  {
-    id: "long",
-    label: "長め",
-    densityDissipation: 0.984,
-    velocityDissipation: 0.91,
-  },
-  {
-    id: "xlong",
-    label: "超長め",
-    // 長めの約5倍残る
-    densityDissipation: 0.9968,
-    velocityDissipation: 0.9813,
-  },
+/** 消える時間の端点（短め → 超長め） */
+const STROKE_FADE_STOPS = [
+  { densityDissipation: 0.915, velocityDissipation: 0.88 },
+  { densityDissipation: 0.952, velocityDissipation: 0.90 },
+  { densityDissipation: 0.984, velocityDissipation: 0.91 },
+  { densityDissipation: 0.9968, velocityDissipation: 0.9813 },
 ];
 
-function composeStroke(width, fade) {
+const STROKE_STORAGE_KEY = "fluid-words-stroke-v1";
+const WIDTH_KEYS = ["splatRadius", "splatForce", "dyeGain", "moveForce", "step"];
+const FADE_KEYS = ["densityDissipation", "velocityDissipation"];
+
+function clamp01(t) {
+  return Math.min(1, Math.max(0, Number(t) || 0));
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function sampleStops(stops, t, keys) {
+  const n = stops.length - 1;
+  const x = clamp01(t) * n;
+  const i = Math.min(n - 1, Math.floor(x));
+  const f = x - i;
+  const a = stops[i];
+  const b = stops[i + 1];
+  const out = {};
+  for (const key of keys) out[key] = lerp(a[key], b[key], f);
+  return out;
+}
+
+function composeStrokeFromSliders(widthT, fadeT) {
+  const width = sampleStops(STROKE_WIDTH_STOPS, widthT, WIDTH_KEYS);
+  const fade = sampleStops(STROKE_FADE_STOPS, fadeT, FADE_KEYS);
+  const wPct = Math.round(clamp01(widthT) * 100);
+  const fPct = Math.round(clamp01(fadeT) * 100);
   return {
-    id: `${width.id}-${fade.id}`,
-    label: `${width.label} / ${fade.label}`,
-    desc: `太さ: ${width.label} / 消え方: ${fade.label}`,
-    splatRadius: width.splatRadius,
-    splatForce: width.splatForce,
-    dyeGain: width.dyeGain,
-    moveForce: width.moveForce,
-    step: width.step,
-    densityDissipation: fade.densityDissipation,
-    velocityDissipation: fade.velocityDissipation,
-    widthId: width.id,
-    fadeId: fade.id,
+    id: `w${wPct}-f${fPct}`,
+    label: `太さ ${wPct}% / 長さ ${fPct}%`,
+    desc: `細い→太い ${wPct}% / 短い→長い ${fPct}%`,
+    ...width,
+    ...fade,
+    widthT: clamp01(widthT),
+    fadeT: clamp01(fadeT),
   };
 }
 
@@ -135,9 +97,10 @@ const paletteEl = document.getElementById("palette");
 const pointers = new Map();
 let sim;
 let activePalette = PALETTES[0];
-let activeWidth = STROKE_WIDTHS[1]; // 標準
-let activeFade = STROKE_FADES[1]; // やや長め
-let activeStroke = composeStroke(activeWidth, activeFade);
+// デフォルト: 旧「標準」「やや長め」相当（各ストップ列の位置）
+let widthT = 0.75;
+let fadeT = 1 / 3;
+let activeStroke = composeStrokeFromSliders(widthT, fadeT);
 let stars = [];
 let last = performance.now();
 let ambientTimer = 0;
@@ -519,8 +482,31 @@ function onUp(id) {
 }
 
 
-function applyStrokeSettings({ flash = true } = {}) {
-  activeStroke = composeStroke(activeWidth, activeFade);
+function loadStrokePrefs() {
+  try {
+    const raw = localStorage.getItem(STROKE_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (typeof data.widthT === "number") widthT = clamp01(data.widthT);
+    if (typeof data.fadeT === "number") fadeT = clamp01(data.fadeT);
+  } catch (_) {
+    /* ignore corrupt prefs */
+  }
+}
+
+function saveStrokePrefs() {
+  try {
+    localStorage.setItem(
+      STROKE_STORAGE_KEY,
+      JSON.stringify({ widthT: clamp01(widthT), fadeT: clamp01(fadeT) })
+    );
+  } catch (_) {
+    /* private mode etc. */
+  }
+}
+
+function applyStrokeSettings({ flash = true, persist = true } = {}) {
+  activeStroke = composeStrokeFromSliders(widthT, fadeT);
   if (!sim) return;
   sim.config.splatRadius = activeStroke.splatRadius;
   sim.config.densityDissipation = activeStroke.densityDissipation;
@@ -529,55 +515,49 @@ function applyStrokeSettings({ flash = true } = {}) {
   sim.config.dyeGain = activeStroke.dyeGain;
   sim.config.curl = 3;
 
-  document.querySelectorAll("#stroke-width .stroke-chip").forEach((el) => {
-    el.classList.toggle("active", el.dataset.widthId === activeWidth.id);
-  });
-  document.querySelectorAll("#stroke-fade .stroke-chip").forEach((el) => {
-    el.classList.toggle("active", el.dataset.fadeId === activeFade.id);
-  });
+  const widthSlider = document.getElementById("stroke-width-slider");
+  const fadeSlider = document.getElementById("stroke-fade-slider");
+  if (widthSlider) widthSlider.value = String(Math.round(clamp01(widthT) * 100));
+  if (fadeSlider) fadeSlider.value = String(Math.round(clamp01(fadeT) * 100));
 
   const foot = document.getElementById("settings-foot");
-  if (foot) {
-    foot.textContent = `筆跡: ${activeWidth.label} / ${activeFade.label}`;
-  }
+  if (foot) foot.textContent = `筆跡: ${activeStroke.label}`;
+
+  if (persist) saveStrokePrefs();
+
   if (flash) {
     const { w, h } = viewSize();
     createCosmicRipple(w * 0.5, h * 0.62, 90, 2.4, 195, 0.55);
   }
 }
 
-function buildChipGroup(containerId, items, key, getActiveId, onPick) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  el.replaceChildren();
-  items.forEach((item) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "stroke-chip" + (item.id === getActiveId() ? " active" : "");
-    btn.dataset[key] = item.id;
-    btn.textContent = item.label;
-    btn.setAttribute("aria-label", item.label);
-    btn.addEventListener(
-      "click",
-      (e) => {
-        e.stopPropagation();
-        onPick(item);
-      },
-      true
-    );
-    el.appendChild(btn);
-  });
-}
-
 function buildStrokeUI() {
-  buildChipGroup("stroke-width", STROKE_WIDTHS, "widthId", () => activeWidth.id, (item) => {
-    activeWidth = item;
-    applyStrokeSettings();
-  });
-  buildChipGroup("stroke-fade", STROKE_FADES, "fadeId", () => activeFade.id, (item) => {
-    activeFade = item;
-    applyStrokeSettings();
-  });
+  const widthSlider = document.getElementById("stroke-width-slider");
+  const fadeSlider = document.getElementById("stroke-fade-slider");
+
+  const onWidth = (e) => {
+    e.stopPropagation();
+    widthT = clamp01(Number(e.target.value) / 100);
+    applyStrokeSettings({ flash: false });
+  };
+  const onFade = (e) => {
+    e.stopPropagation();
+    fadeT = clamp01(Number(e.target.value) / 100);
+    applyStrokeSettings({ flash: false });
+  };
+  const flashOnce = () => applyStrokeSettings({ flash: true, persist: true });
+
+  widthSlider?.addEventListener("input", onWidth);
+  fadeSlider?.addEventListener("input", onFade);
+  widthSlider?.addEventListener("change", flashOnce);
+  fadeSlider?.addEventListener("change", flashOnce);
+
+  // iOS: スライダー操作中に描画へタッチが抜けないよう止める
+  for (const el of [widthSlider, fadeSlider]) {
+    if (!el) continue;
+    el.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+    el.addEventListener("pointerdown", (e) => e.stopPropagation());
+  }
 }
 
 function buildPaletteUI() {
@@ -755,9 +735,10 @@ function boot() {
     document.body.innerHTML = "<p style='color:#fff;padding:24px;font-family:sans-serif;line-height:1.6'>描画の初期化に失敗しました。<br><small style='opacity:.7'>" + msg.replace(/</g,"&lt;") + "</small></p>";
     return;
   }
+  loadStrokePrefs();
   buildPaletteUI();
   buildStrokeUI();
-  applyStrokeSettings({ flash: false });
+  applyStrokeSettings({ flash: false, persist: false });
   bindChromeUI();
   bindInput();
   installViewportLock();
