@@ -21,7 +21,7 @@ const STROKE_FADE_STOPS = [
   { densityDissipation: 0.9968, velocityDissipation: 0.9813 },
 ];
 
-const STROKE_STORAGE_KEY = "fluid-words-stroke-v2";
+const STROKE_STORAGE_KEY = "fluid-words-stroke-v3";
 const WIDTH_KEYS = ["splatRadius", "splatForce", "dyeGain", "moveForce", "step"];
 const FADE_KEYS = ["densityDissipation", "velocityDissipation"];
 
@@ -97,9 +97,9 @@ const paletteEl = document.getElementById("palette");
 const pointers = new Map();
 let sim;
 let activePalette = PALETTES[0];
-// デフォルト: 極細 / 長め（各ストップ列の位置）
-let widthT = 0.25; // STROKE_WIDTH_STOPS の「極細」
-let fadeT = 2 / 3; // STROKE_FADE_STOPS の「長め」
+// デフォルト: 太さ 20% / 消える時間 80%
+let widthT = 0.2;
+let fadeT = 0.8;
 let activeStroke = composeStrokeFromSliders(widthT, fadeT);
 let stars = [];
 let last = performance.now();
@@ -253,14 +253,15 @@ function makeStar(dpr) {
     x: Math.random(),
     y: Math.random(),
     r: (0.4 + Math.random() * 1.4) * dpr,
-    a: 0.2 + Math.random() * 0.7,
+    a: Math.min(1, (0.2 + Math.random() * 0.7) * 1.2),
     s: 0.004 + Math.random() * 0.01,
     p: Math.random() * Math.PI * 2,
   };
 }
 
 function starDensityDivisor() {
-  return Math.max(2500, 4500 / (1 + cosmosBoost * 0.18));
+  // 以前の 4500 基準の約2倍の星数
+  return Math.max(1250, 2250 / (1 + cosmosBoost * 0.18));
 }
 
 function resizeStars() {
@@ -377,7 +378,8 @@ function drawStars(t) {
   ctx.clearRect(0, 0, w, h);
   for (const star of stars) {
     star.p += star.s;
-    const alpha = Math.max(0.08, star.a + Math.sin(star.p + t * 0.001) * 0.25);
+    // 星本体を約1.2倍明るく（base a は makeStar 側で1.2倍済み）
+    const alpha = Math.min(1, Math.max(0.096, star.a + Math.sin(star.p + t * 0.001) * 0.3));
     ctx.fillStyle = `rgba(230, 235, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(star.x * w, star.y * h, star.r, 0, Math.PI * 2);
