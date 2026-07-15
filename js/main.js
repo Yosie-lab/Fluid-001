@@ -73,6 +73,13 @@ const STROKE_FADES = [
     densityDissipation: 0.984,
     velocityDissipation: 0.91,
   },
+  {
+    id: "xlong",
+    label: "超長め",
+    // 長めの約2倍残る（dissipation^n の時間スケール）
+    densityDissipation: 0.992,
+    velocityDissipation: 0.954,
+  },
 ];
 
 function composeStroke(width, fade) {
