@@ -1,6 +1,6 @@
 import { FluidSim } from "./fluid.js";
 import { findPositiveWord } from "./positive.js";
-import { InkCapture, recognizeInk } from "./ink.js";
+import { InkCapture, recognizeInk, preloadOcr } from "./ink.js";
 import { createMeteorSystem } from "./meteors.js";
 
 
@@ -311,21 +311,48 @@ function showPositiveToast(word) {
 function celebratePositiveWord(word, cx, cy) {
   cosmosBoost = Math.min(12, cosmosBoost + 1);
   meteorSystem?.setBoost(cosmosBoost);
-  addBonusStars(28 + cosmosBoost * 4);
+  addBonusStars(36 + cosmosBoost * 6);
 
-  const meteorCount = 4 + Math.floor(cosmosBoost / 2);
+  const meteorCount = 6 + Math.floor(cosmosBoost / 2);
   meteorSystem?.spawnBurst(cx, cy, meteorCount);
 
-  const ripplesToSpawn = 2 + Math.floor(cosmosBoost / 3);
+  const ripplesToSpawn = 3 + Math.floor(cosmosBoost / 3);
   for (let i = 0; i < ripplesToSpawn; i++) {
     createCosmicRipple(
-      cx + (Math.random() - 0.5) * 40,
-      cy + (Math.random() - 0.5) * 40,
-      120 + i * 35 + Math.random() * 40,
-      1.8 + i * 0.35,
+      cx + (Math.random() - 0.5) * 50,
+      cy + (Math.random() - 0.5) * 50,
+      140 + i * 45 + Math.random() * 50,
+      1.6 + i * 0.4,
       rippleHue(),
-      0.78 - i * 0.12
+      0.9 - i * 0.1
     );
+  }
+
+  // 背景フルードも反応させる
+  if (sim) {
+    const { w, h } = viewSize();
+    const ux = Math.min(1, Math.max(0, cx / Math.max(1, w)));
+    const uy = 1 - Math.min(1, Math.max(0, cy / Math.max(1, h)));
+    for (let i = 0; i < 5; i++) {
+      const color = sim.nextColor();
+      const ang = Math.random() * Math.PI * 2;
+      const force = 900 + Math.random() * 900;
+      sim.splat(
+        Math.min(1, Math.max(0, ux + (Math.random() - 0.5) * 0.12)),
+        Math.min(1, Math.max(0, uy + (Math.random() - 0.5) * 0.12)),
+        Math.cos(ang) * force,
+        Math.sin(ang) * force,
+        color
+      );
+    }
+  }
+
+  // 周囲にも星を短時間増やす
+  for (let i = 0; i < 3; i++) {
+    setTimeout(() => {
+      if (meteorSystem) meteorSystem.spawnBackground();
+      spawnAmbientRipple();
+    }, 180 + i * 220);
   }
 
   showPositiveToast(word);
@@ -346,8 +373,11 @@ async function finishInkSession() {
 
   try {
     const text = await recognizeInk(crop);
+    console.log("[Fluid Words OCR]", text);
     const word = findPositiveWord(text);
-    if (word) celebratePositiveWord(word, cx, cy);
+    if (word) {
+      celebratePositiveWord(word, cx, cy);
+    }
   } catch (err) {
     console.warn("Positive word scan skipped:", err);
   }
@@ -355,7 +385,7 @@ async function finishInkSession() {
 
 function scheduleInkAnalysis() {
   if (analyzeTimer) clearTimeout(analyzeTimer);
-  analyzeTimer = setTimeout(() => finishInkSession(), 1200);
+  analyzeTimer = setTimeout(() => finishInkSession(), 900);
 }
 
 function recordInkPoint(clientX, clientY) {
@@ -367,6 +397,7 @@ function recordInkPoint(clientX, clientY) {
   if (!inkSessionActive) {
     inkCapture.beginSession();
     inkSessionActive = true;
+    preloadOcr();
   }
   inkCapture.stroke(clientX, clientY);
 }
@@ -746,6 +777,7 @@ function boot() {
   installViewportLock();
   inkCapture = new InkCapture();
   inkCapture.resize(viewSize().w, viewSize().h);
+  preloadOcr();
   meteorSystem = createMeteorSystem();
   resizeStars();
   resizeRippleCanvas();

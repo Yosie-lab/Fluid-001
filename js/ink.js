@@ -4,7 +4,7 @@ let ocrLoading = null;
 export class InkCapture {
   constructor() {
     this.canvas = document.createElement("canvas");
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
     this.dpr = 1;
     this.lastX = null;
     this.lastY = null;
@@ -43,8 +43,10 @@ export class InkCapture {
     this.bounds.maxX = Math.max(this.bounds.maxX, px);
     this.bounds.maxY = Math.max(this.bounds.maxY, py);
 
+    // OCR向けに太くはっきり描く
     this.ctx.strokeStyle = "#fff";
-    this.ctx.lineWidth = 11 * this.dpr;
+    this.ctx.fillStyle = "#fff";
+    this.ctx.lineWidth = 16 * this.dpr;
     this.ctx.lineCap = "round";
     this.ctx.lineJoin = "round";
     this.ctx.beginPath();
@@ -53,9 +55,8 @@ export class InkCapture {
       this.ctx.lineTo(px, py);
       this.ctx.stroke();
     } else {
-      this.ctx.fillStyle = "#fff";
       this.ctx.beginPath();
-      this.ctx.arc(px, py, 5 * this.dpr, 0, Math.PI * 2);
+      this.ctx.arc(px, py, 8 * this.dpr, 0, Math.PI * 2);
       this.ctx.fill();
     }
 
@@ -74,11 +75,11 @@ export class InkCapture {
   hasEnoughInk() {
     const w = this.bounds.maxX - this.bounds.minX;
     const h = this.bounds.maxY - this.bounds.minY;
-    return this.pointCount >= 10 && w > 30 * this.dpr && h > 24 * this.dpr;
+    return this.pointCount >= 6 && w > 16 * this.dpr && h > 14 * this.dpr;
   }
 
   getCropCanvas() {
-    const pad = 18 * this.dpr;
+    const pad = 28 * this.dpr;
     const { minX, minY, maxX, maxY } = this.bounds;
     const w = Math.ceil(maxX - minX + pad * 2);
     const h = Math.ceil(maxY - minY + pad * 2);
@@ -92,13 +93,14 @@ export class InkCapture {
     octx.fillRect(0, 0, w, h);
     octx.drawImage(this.canvas, minX - pad, minY - pad, w, h, 0, 0, w, h);
 
-    const scale = Math.min(3, Math.max(1.6, 200 / Math.max(w, h)));
-    if (scale <= 1.01) return out;
-
+    // OCR精度のためアップスケールを強める
+    const target = 320;
+    const scale = Math.min(4.5, Math.max(2.2, target / Math.max(w, h)));
     const up = document.createElement("canvas");
     up.width = Math.ceil(w * scale);
     up.height = Math.ceil(h * scale);
     const uctx = up.getContext("2d");
+    uctx.imageSmoothingEnabled = true;
     uctx.fillStyle = "#000";
     uctx.fillRect(0, 0, up.width, up.height);
     uctx.drawImage(out, 0, 0, up.width, up.height);
@@ -113,16 +115,33 @@ async function getOcrWorker() {
       const { createWorker } = await import(
         "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js"
       );
-      const worker = await createWorker("jpn+eng", 1, { logger: () => {} });
+      const worker = await createWorker("jpn+eng", 1, {
+        logger: () => {},
+      });
+      // 手書き寄りに少し甘く
+      await worker.setParameters({
+        tessedit_pageseg_mode: "7", // 単一テキスト行
+        preserve_interword_spaces: "1",
+      });
       ocrWorker = worker;
       return worker;
-    })();
+    })().catch((err) => {
+      ocrLoading = null;
+      throw err;
+    });
   }
   return ocrLoading;
+}
+
+/** 初回書き込み前に言語データを先読み */
+export function preloadOcr() {
+  return getOcrWorker().catch((err) => {
+    console.warn("OCR preload failed:", err);
+  });
 }
 
 export async function recognizeInk(cropCanvas) {
   const worker = await getOcrWorker();
   const { data } = await worker.recognize(cropCanvas);
-  return data.text || "";
+  return (data && data.text) || "";
 }
