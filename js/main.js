@@ -9,11 +9,11 @@ const STROKE_WIDTHS = [
   {
     id: "hairline",
     label: "超極細",
-    splatRadius: 0.006,
-    splatForce: 300,
-    dyeGain: 0.033,
-    moveForce: 0.037,
-    step: 0.002,
+    splatRadius: 0.0045,
+    splatForce: 225,
+    dyeGain: 0.025,
+    moveForce: 0.028,
+    step: 0.0014,
   },
   {
     id: "extrafine",
