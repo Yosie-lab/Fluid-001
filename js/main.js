@@ -7,6 +7,15 @@ import { createMeteorSystem } from "./meteors.js";
 /** 太さ（線の幅・筆圧まわり） */
 const STROKE_WIDTHS = [
   {
+    id: "hairline",
+    label: "超極細",
+    splatRadius: 0.009,
+    splatForce: 480,
+    dyeGain: 0.055,
+    moveForce: 0.07,
+    step: 0.0035,
+  },
+  {
     id: "extrafine",
     label: "極細",
     splatRadius: 0.018,
