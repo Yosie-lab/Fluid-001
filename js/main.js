@@ -21,7 +21,7 @@ const STROKE_FADE_STOPS = [
   { densityDissipation: 0.9968, velocityDissipation: 0.9813 },
 ];
 
-const STROKE_STORAGE_KEY = "fluid-words-stroke-v1";
+const STROKE_STORAGE_KEY = "fluid-words-stroke-v2";
 const WIDTH_KEYS = ["splatRadius", "splatForce", "dyeGain", "moveForce", "step"];
 const FADE_KEYS = ["densityDissipation", "velocityDissipation"];
 
@@ -97,9 +97,9 @@ const paletteEl = document.getElementById("palette");
 const pointers = new Map();
 let sim;
 let activePalette = PALETTES[0];
-// デフォルト: 旧「標準」「やや長め」相当（各ストップ列の位置）
-let widthT = 0.75;
-let fadeT = 1 / 3;
+// デフォルト: 極細 / 長め（各ストップ列の位置）
+let widthT = 0.25; // STROKE_WIDTH_STOPS の「極細」
+let fadeT = 2 / 3; // STROKE_FADE_STOPS の「長め」
 let activeStroke = composeStrokeFromSliders(widthT, fadeT);
 let stars = [];
 let last = performance.now();
