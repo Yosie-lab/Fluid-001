@@ -200,9 +200,8 @@ function bumpSkyLit(amount = 0.2) {
 
 function spawnStrokeRipple(x, y) {
   const hue = rippleHue();
-  // 通常の宇宙波紋と同じ明るさ／広がりは小さめ
+  // 通常波紋と同じ alpha。線幅は描画時にサイズ比例で合わせる
   createCosmicRipple(x, y, 26 + Math.random() * 12, 1.5 + Math.random() * 0.35, hue, 0.85, "stroke");
-  bumpSkyLit(0.05);
 }
 
 /** 指を離したときの波紋（指の位置に必ず出す） */
@@ -268,11 +267,12 @@ function drawRipples() {
   for (const r of ripples) {
     const hue = r.hue || 195;
     const isBless = r.kind === "bless";
-    // なぞり波紋は通常と同じ描画。離筆の祝福だけ少し強調
+    // 小さいなぞり波紋でも通常と同じ見た目の「細いリング」になるよう線幅をスケール
+    const sizeScale = isBless ? 1 : Math.min(1, Math.max(0.28, r.maxR / 150));
     const coreMul = isBless ? 0.85 : 0.55;
     const glowMul = isBless ? 0.35 : 0.15;
-    const coreW = isBless ? 4.2 : 3.2;
-    const glowW = isBless ? 9.5 : 6.4;
+    const coreW = (isBless ? 4.2 : 3.2) * sizeScale;
+    const glowW = (isBless ? 9.5 : 6.4) * sizeScale;
 
     if (isBless && r.r < 10) {
       const g = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, 12);
@@ -287,13 +287,13 @@ function drawRipples() {
     ctx.strokeStyle = `hsla(${hue}, 70%, 75%, ${r.alpha * coreMul})`;
     ctx.lineWidth = coreW;
     ctx.beginPath();
-    ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+    ctx.arc(r.x, r.y, Math.max(0.5, r.r), 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.strokeStyle = `hsla(${hue}, 70%, 75%, ${r.alpha * glowMul})`;
     ctx.lineWidth = glowW;
     ctx.beginPath();
-    ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+    ctx.arc(r.x, r.y, Math.max(0.5, r.r), 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();
