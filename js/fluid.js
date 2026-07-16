@@ -379,35 +379,33 @@ vec3 energyParticles(vec2 uv, vec3 fluid, float dens, float cellPx, float sharpn
 void main () {
   vec3 fluid = texture(uTexture, vUv).rgb;
   float dens = max(fluid.r, max(fluid.g, fluid.b));
-  dens = pow(clamp(dens, 0.0, 4.0), 0.8);
+  dens = pow(clamp(dens, 0.0, 4.0), 0.72);
 
-  vec3 haze = fluid * 0.04;
+  // 筆跡本体：はっきり見える発光インク（パーティクル頼みにしない）
+  vec3 ink = fluid * (0.55 + dens * 0.85);
+  ink += normalize(fluid + vec3(0.08)) * dens * dens * 1.35;
+  ink += vec3(0.9, 0.95, 1.08) * pow(dens, 1.6) * 0.55;
+
+  // きらめきは控えめ（文字の流れを邪魔しない）
   vec3 grains = vec3(0.0);
+  grains += energyParticles(vUv, fluid, dens, 14.0, 80.0, 0.06, 1.0, 0.45);
+  grains += energyParticles(vUv + 0.37, fluid, dens, 5.0, 180.0, 0.09, 2.0, 0.4);
+  float dust = hash21(floor(vUv * uResolution) + floor(uTime * 14.0));
+  grains += speck(fluid, dens, dust, 0.9, 0.55);
 
-  // 粗 → 細のミックス（空間の奥行きが出る）
-  grains += energyParticles(vUv, fluid, dens, 28.0, 36.0, 0.04, 1.0, 1.15);   // とても粗い
-  grains += energyParticles(vUv + 0.11, fluid, dens, 16.0, 70.0, 0.05, 1.0, 1.0); // 粗い
-  grains += energyParticles(vUv + 0.29, fluid, dens, 9.0, 110.0, 0.06, 2.0, 0.95); // 中
-  grains += energyParticles(vUv + 0.47, fluid, dens, 4.5, 200.0, 0.08, 2.0, 1.0);  // 細
-  grains += energyParticles(vUv + 0.67, fluid, dens, 2.4, 320.0, 0.10, 3.0, 0.9);  // より細
-  grains += energyParticles(vUv + 0.83, fluid, dens, 1.3, 480.0, 0.12, 3.0, 0.75); // 極細
-
-  float dust = hash21(floor(vUv * uResolution) + floor(uTime * 18.0));
-  float dust2 = hash21(floor(vUv * uResolution * 1.6) + 29.3);
-  grains += speck(fluid, dens, dust, 0.84, 1.2);
-  grains += speck(fluid, dens, dust2, 0.91, 0.8);
-
-  vec3 c = haze + grains;
+  vec3 c = ink + grains * 0.65;
 
   if (useBloom > 0.5) {
     vec3 b = texture(uBloom, vUv).rgb;
-    c += b * bloomIntensity * 0.42;
+    c += b * bloomIntensity * 0.72;
   }
 
-  c = pow(max(c, 0.0), vec3(0.9));
-  c = mix(c, c * vec3(0.85, 0.92, 1.22), 0.22);
-  float vignette = smoothstep(1.4, 0.2, length(vUv - 0.5) * 1.5);
-  c *= mix(0.48, 1.0, vignette);
+  c = pow(max(c, 0.0), vec3(0.88));
+  c = mix(c, c * vec3(0.88, 0.94, 1.18), 0.18);
+  // 筆跡がある場所はビネットを弱めて書き味を優先
+  float vignette = smoothstep(1.45, 0.25, length(vUv - 0.5) * 1.45);
+  float inkProtect = smoothstep(0.02, 0.22, dens);
+  c *= mix(mix(0.52, 1.0, vignette), 1.0, inkProtect * 0.85);
   fragColor = vec4(c, 1.0);
 }`),
       bloomPrefilter: make(`${SHADER_BASE}

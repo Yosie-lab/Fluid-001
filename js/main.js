@@ -2,27 +2,29 @@ import { FluidSim } from "./fluid.js";
 import { findPositiveWord } from "./positive.js";
 import { InkCapture, recognizeInk, preloadOcr } from "./ink.js";
 import { createMeteorSystem } from "./meteors.js";
-import { createStrokeParticles } from "./particles.js";
 
 
-/** 太さの端点（超極細 → 中太）。スライダーで連続補間 */
+/**
+ * 太さの端点（細い → 太い）。
+ * splatRadius は Pavel 系と同じく /100 される前提で、書きやすい太さに寄せる。
+ */
 const STROKE_WIDTH_STOPS = [
-  { splatRadius: 0.0045, splatForce: 225, dyeGain: 0.025, moveForce: 0.028, step: 0.0014 },
-  { splatRadius: 0.018, splatForce: 900, dyeGain: 0.10, moveForce: 0.11, step: 0.0055 },
-  { splatRadius: 0.031, splatForce: 1150, dyeGain: 0.135, moveForce: 0.145, step: 0.007 },
-  { splatRadius: 0.055, splatForce: 1725, dyeGain: 0.175, moveForce: 0.205, step: 0.008 },
-  { splatRadius: 0.086, splatForce: 1900, dyeGain: 0.21, moveForce: 0.23, step: 0.009 },
+  { splatRadius: 0.14, splatForce: 1800, dyeGain: 0.22, moveForce: 0.045, step: 0.004 },
+  { splatRadius: 0.22, splatForce: 2400, dyeGain: 0.32, moveForce: 0.06, step: 0.005 },
+  { splatRadius: 0.32, splatForce: 3000, dyeGain: 0.42, moveForce: 0.075, step: 0.006 },
+  { splatRadius: 0.44, splatForce: 3600, dyeGain: 0.52, moveForce: 0.09, step: 0.007 },
+  { splatRadius: 0.58, splatForce: 4200, dyeGain: 0.62, moveForce: 0.11, step: 0.008 },
 ];
 
-/** 消える時間の端点（短め → 超長め） */
+/** 消える時間の端点（短め → 長め）。文字がすぐ消えないよう全体を長めに */
 const STROKE_FADE_STOPS = [
-  { densityDissipation: 0.915, velocityDissipation: 0.88 },
-  { densityDissipation: 0.952, velocityDissipation: 0.90 },
-  { densityDissipation: 0.984, velocityDissipation: 0.91 },
-  { densityDissipation: 0.9968, velocityDissipation: 0.9813 },
+  { densityDissipation: 0.955, velocityDissipation: 0.92 },
+  { densityDissipation: 0.975, velocityDissipation: 0.94 },
+  { densityDissipation: 0.988, velocityDissipation: 0.96 },
+  { densityDissipation: 0.9955, velocityDissipation: 0.978 },
 ];
 
-const STROKE_STORAGE_KEY = "fluid-words-stroke-v3";
+const STROKE_STORAGE_KEY = "fluid-words-stroke-v4";
 const WIDTH_KEYS = ["splatRadius", "splatForce", "dyeGain", "moveForce", "step"];
 const FADE_KEYS = ["densityDissipation", "velocityDissipation"];
 
@@ -98,9 +100,9 @@ const paletteEl = document.getElementById("palette");
 const pointers = new Map();
 let sim;
 let activePalette = PALETTES[0];
-// デフォルト: 太さ 20% / 消える時間 80%
-let widthT = 0.2;
-let fadeT = 0.8;
+// デフォルト: 太さ 35% / 消える時間 75%（なぞって気持ちよい書き味）
+let widthT = 0.35;
+let fadeT = 0.75;
 let activeStroke = composeStrokeFromSliders(widthT, fadeT);
 let stars = [];
 let last = performance.now();
@@ -113,7 +115,6 @@ let inkSessionActive = false;
 let analyzeTimer = null;
 let toastTimer = null;
 let meteorSystem = null;
-let strokeParticles = null;
 let pendingResize = false;
 
 function viewSize() {
@@ -438,17 +439,16 @@ function isUiTarget(target) {
   );
 }
 
-function strokeSplat(x, y, dx, dy, color) {
-  // 線方向にごく弱い力＝文字が流れにくく、筆跡が残る
-  const force = sim.config.splatForce * (activeStroke.moveForce ?? 0.22);
-  // dyeGain は sim 側に反映済み。ここは力のみ。
+function strokeSplat(x, y, dx, dy, color, forceScale = 1) {
+  // 線方向の力は弱め＝文字が流れにくく、筆跡が読みやすい
+  const force = sim.config.splatForce * (activeStroke.moveForce ?? 0.06) * forceScale;
   sim.splat(x, y, dx * force, dy * force, color);
 }
 
 function getPointer(id) {
   let p = pointers.get(id);
   if (!p) {
-    p = { id, x: 0, y: 0, clientX: 0, clientY: 0, dx: 0, dy: 0, down: false, moved: false, color: [1, 1, 1] };
+    p = { id, x: 0, y: 0, dx: 0, dy: 0, down: false, moved: false, color: [1, 1, 1] };
     pointers.set(id, p);
   }
   return p;
@@ -466,14 +466,14 @@ function onDown(id, clientX, clientY) {
   p.moved = false;
   p.x = uv.x;
   p.y = uv.y;
-  p.clientX = clientX;
-  p.clientY = clientY;
   p.dx = 0;
   p.dy = 0;
   p.color = sim.nextColor();
-  // 書き始めの点（拡散させない）
-  strokeSplat(p.x, p.y, 0, 0, p.color);
-  strokeParticles?.spawn(clientX, clientY, p.color, 6);
+  // 書き始め：少し濃い点で「乗った」感を出す（速度ゼロ＝にじませない）
+  const prevGain = sim.config.dyeGain;
+  sim.config.dyeGain = prevGain * 1.35;
+  strokeSplat(p.x, p.y, 0, 0, p.color, 0);
+  sim.config.dyeGain = prevGain;
   touchLayer.classList.add("active");
 }
 
@@ -484,28 +484,23 @@ function onMove(id, clientX, clientY) {
   const dx = uv.x - p.x;
   const dy = uv.y - p.y;
   const dist = Math.hypot(dx, dy);
+  if (dist < 0.0004) return;
 
-  // 速いスワイプでも文字が途切れないよう補間
-  const step = activeStroke.step ?? 0.008;
-  const steps = Math.max(1, Math.min(22, Math.ceil(dist / step)));
+  // 速いスワイプでも途切れないよう細かく補間（なめらかな一筆）
+  const step = activeStroke.step ?? 0.005;
+  const steps = Math.max(1, Math.min(36, Math.ceil(dist / step)));
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const x = p.x + dx * t;
     const y = p.y + dy * t;
-    strokeSplat(x, y, dx / steps, dy / steps, p.color);
+    strokeSplat(x, y, dx / steps, dy / steps, p.color, 1);
   }
-  // 筆跡に沿ってパーティクルをまき散らす
-  const prevX = p.clientX ?? clientX;
-  const prevY = p.clientY ?? clientY;
-  strokeParticles?.spawnAlong(prevX, prevY, clientX, clientY, p.color, 1);
   recordInkPoint(clientX, clientY);
 
   p.dx = dx;
   p.dy = dy;
   p.x = uv.x;
   p.y = uv.y;
-  p.clientX = clientX;
-  p.clientY = clientY;
   p.moved = false;
 }
 
@@ -744,15 +739,12 @@ function frame(now) {
 
   updateRipples();
   meteorSystem?.update(now);
-  strokeParticles?.update(dt);
   // move中は onMove で直接 splat 済み。down状態の維持だけ。
   sim.update(dt);
   drawStars(now);
-  if (starsCanvas) {
+  if (meteorSystem && starsCanvas) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const ctx = starsCanvas.getContext("2d");
-    meteorSystem?.draw(ctx, dpr);
-    strokeParticles?.draw(ctx, dpr);
+    meteorSystem.draw(starsCanvas.getContext("2d"), dpr);
   }
   drawRipples();
   requestAnimationFrame(frame);
@@ -770,11 +762,13 @@ function boot() {
       densityDissipation: activeStroke.densityDissipation,
       velocityDissipation: activeStroke.velocityDissipation,
       dyeGain: activeStroke.dyeGain,
-      curl: 3,
-      pressure: 0.7,
-      simResolution: 96,
-      dyeResolution: 320,
-      pressureIterations: 10,
+      curl: 1.4, // 渦を弱めて文字が流れにくい
+      pressure: 0.78,
+      bloomIntensity: 1.05,
+      bloomThreshold: 0.18,
+      simResolution: 112,
+      dyeResolution: 512,
+      pressureIterations: 14,
     });
   } catch (err) {
     console.error(err);
@@ -793,7 +787,6 @@ function boot() {
   inkCapture.resize(viewSize().w, viewSize().h);
   preloadOcr();
   meteorSystem = createMeteorSystem();
-  strokeParticles = createStrokeParticles();
   resizeStars();
   resizeRippleCanvas();
   sim.multipleSplats(1);
