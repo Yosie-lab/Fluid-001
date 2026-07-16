@@ -201,7 +201,7 @@ function bumpSkyLit(amount = 0.2) {
 function spawnStrokeRipple(x, y) {
   const hue = rippleHue();
   // なぞり中は1輪だけ（最初が密集しない）
-  createCosmicRipple(x, y, 44 + Math.random() * 18, 1.4 + Math.random() * 0.3, hue, 0.48, "stroke");
+  createCosmicRipple(x, y, 44 + Math.random() * 18, 1.4 + Math.random() * 0.3, hue, 0.40, "stroke");
   bumpSkyLit(0.05);
 }
 
@@ -269,15 +269,15 @@ function drawRipples() {
     const hue = r.hue || 195;
     const isStroke = r.kind === "stroke";
     const isBless = r.kind === "bless";
-    const coreMul = isStroke ? 0.60 : isBless ? 0.85 : 0.55;
-    const glowMul = isStroke ? 0.22 : isBless ? 0.35 : 0.15;
-    const coreW = isStroke ? 3.4 : isBless ? 4.2 : 3.2;
-    const glowW = isStroke ? 7.4 : isBless ? 9.5 : 6.4;
+    const coreMul = isStroke ? 0.52 : isBless ? 0.85 : 0.55;
+    const glowMul = isStroke ? 0.18 : isBless ? 0.35 : 0.15;
+    const coreW = isStroke ? 3.2 : isBless ? 4.2 : 3.2;
+    const glowW = isStroke ? 6.8 : isBless ? 9.5 : 6.4;
 
     if ((isStroke || isBless) && r.r < 10) {
       // 発生直後の芯を見せる
       const g = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, 12);
-      g.addColorStop(0, `hsla(${hue}, 85%, 88%, ${r.alpha * (isStroke ? 0.30 : 0.55)})`);
+      g.addColorStop(0, `hsla(${hue}, 85%, 88%, ${r.alpha * (isStroke ? 0.24 : 0.55)})`);
       g.addColorStop(1, `hsla(${hue}, 80%, 70%, 0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
