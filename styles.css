@@ -325,6 +325,32 @@ body {
   color: rgba(238, 234, 255, 0.8);
 }
 
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.settings-toggle-label {
+  font-size: 0.64rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(246, 242, 255, 0.88);
+}
+
+.settings-toggle input[type="checkbox"] {
+  width: 42px;
+  height: 24px;
+  margin: 0;
+  accent-color: #8ef6ff;
+  cursor: pointer;
+}
+
 .intro {
   position: fixed;
   inset: 0;

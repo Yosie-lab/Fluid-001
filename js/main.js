@@ -2,6 +2,7 @@ import { FluidSim } from "./fluid.js";
 import { findPositiveWord } from "./positive.js";
 import { InkCapture, recognizeInk, preloadOcr } from "./ink.js";
 import { createMeteorSystem } from "./meteors.js";
+import { createHaptics } from "./haptics.js";
 
 
 /** 太さの端点（超極細 → 中太）。スライダーで連続補間 */
@@ -112,7 +113,13 @@ let inkSessionActive = false;
 let analyzeTimer = null;
 let toastTimer = null;
 let meteorSystem = null;
+let haptics = null;
 let pendingResize = false;
+
+/** なぞり波紋の間隔（px） */
+const STROKE_RIPPLE_STEP = 34;
+/** 曲がり角とみなす角度（ラジアン） */
+const STROKE_TURN_ANGLE = 0.72;
 
 function viewSize() {
   const vv = window.visualViewport;
@@ -164,7 +171,10 @@ function installScrollLock() {
 }
 
 // 脳リフレクソ同系統: 宇宙空間の広がる光の波紋
+const MAX_RIPPLES = 48;
+
 function createCosmicRipple(x, y, maxR, speed, hue, alpha) {
+  if (ripples.length >= MAX_RIPPLES) ripples.shift();
   ripples.push({
     x,
     y,
@@ -175,6 +185,46 @@ function createCosmicRipple(x, y, maxR, speed, hue, alpha) {
     alpha: alpha !== undefined ? alpha : 0.8,
     hue: hue !== undefined && hue !== null ? hue : 195,
   });
+}
+
+function spawnStrokeRipple(x, y) {
+  createCosmicRipple(
+    x,
+    y,
+    34 + Math.random() * 26,
+    2.2 + Math.random() * 0.7,
+    rippleHue(),
+    0.34 + Math.random() * 0.1
+  );
+}
+
+function spawnStrokeRipplesAlong(x0, y0, x1, y1) {
+  const dist = Math.hypot(x1 - x0, y1 - y0);
+  if (dist < 10) return;
+  const steps = Math.max(1, Math.floor(dist / STROKE_RIPPLE_STEP));
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    spawnStrokeRipple(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+  }
+}
+
+/** 指を離したときのプチ祝福（OCRの前に届く） */
+function celebrateStrokeComplete(cx, cy) {
+  addBonusStars(4 + Math.floor(Math.random() * 4));
+  createCosmicRipple(cx, cy, 88, 1.9, rippleHue(), 0.62);
+  createCosmicRipple(cx, cy, 52, 2.5, rippleHue(), 0.38);
+
+  if (!sim) return;
+  const { w, h } = viewSize();
+  const ux = Math.min(1, Math.max(0, cx / Math.max(1, w)));
+  const uy = 1 - Math.min(1, Math.max(0, cy / Math.max(1, h)));
+  const color = sim.nextColor();
+  sim.splat(ux, uy, 0, 0, color);
+  for (let i = 0; i < 2; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const force = 320 + Math.random() * 280;
+    sim.splat(ux, uy, Math.cos(ang) * force, Math.sin(ang) * force, color);
+  }
 }
 
 function spawnAmbientRipple() {
@@ -432,7 +482,7 @@ function isUiTarget(target) {
   return !!(
     target &&
     target.closest &&
-    target.closest("#palette, .swatch, button, a, #settings-panel, #btn-settings, #intro")
+    target.closest("#palette, .swatch, button, a, #settings-panel, #btn-settings, #intro, #chk-haptic, .settings-toggle")
   );
 }
 
@@ -446,7 +496,20 @@ function strokeSplat(x, y, dx, dy, color) {
 function getPointer(id) {
   let p = pointers.get(id);
   if (!p) {
-    p = { id, x: 0, y: 0, dx: 0, dy: 0, down: false, moved: false, color: [1, 1, 1] };
+    p = {
+      id,
+      x: 0,
+      y: 0,
+      clientX: 0,
+      clientY: 0,
+      dx: 0,
+      dy: 0,
+      down: false,
+      moved: false,
+      lastAngle: null,
+      drew: false,
+      color: [1, 1, 1],
+    };
     pointers.set(id, p);
   }
   return p;
@@ -462,13 +525,18 @@ function onDown(id, clientX, clientY) {
   const uv = clientToUV(clientX, clientY);
   p.down = true;
   p.moved = false;
+  p.drew = false;
   p.x = uv.x;
   p.y = uv.y;
+  p.clientX = clientX;
+  p.clientY = clientY;
   p.dx = 0;
   p.dy = 0;
+  p.lastAngle = null;
   p.color = sim.nextColor();
-  // 書き始めの点（拡散させない）
   strokeSplat(p.x, p.y, 0, 0, p.color);
+  spawnStrokeRipple(clientX, clientY);
+  haptics?.touchStart();
   touchLayer.classList.add("active");
 }
 
@@ -479,8 +547,11 @@ function onMove(id, clientX, clientY) {
   const dx = uv.x - p.x;
   const dy = uv.y - p.y;
   const dist = Math.hypot(dx, dy);
+  if (dist < 0.0004) return;
 
-  // 速いスワイプでも文字が途切れないよう補間
+  const prevClientX = p.clientX;
+  const prevClientY = p.clientY;
+
   const step = activeStroke.step ?? 0.008;
   const steps = Math.max(1, Math.min(22, Math.ceil(dist / step)));
   for (let i = 1; i <= steps; i++) {
@@ -489,18 +560,44 @@ function onMove(id, clientX, clientY) {
     const y = p.y + dy * t;
     strokeSplat(x, y, dx / steps, dy / steps, p.color);
   }
+
+  spawnStrokeRipplesAlong(prevClientX, prevClientY, clientX, clientY);
+
+  const angle = Math.atan2(dy, dx);
+  if (p.lastAngle != null && dist > 0.006) {
+    let turn = Math.abs(angle - p.lastAngle);
+    if (turn > Math.PI) turn = Math.PI * 2 - turn;
+    if (turn >= STROKE_TURN_ANGLE) {
+      haptics?.strokeTick();
+      p.lastAngle = angle;
+    }
+  } else if (p.lastAngle == null) {
+    p.lastAngle = angle;
+  }
+
   recordInkPoint(clientX, clientY);
 
   p.dx = dx;
   p.dy = dy;
   p.x = uv.x;
   p.y = uv.y;
-  p.moved = false;
+  p.clientX = clientX;
+  p.clientY = clientY;
+  p.drew = true;
 }
 
 function onUp(id) {
   const p = pointers.get(id);
   if (!p) return;
+
+  if (p.drew && inkCapture?.hasEnoughInk()) {
+    const { x, y } = inkCapture.getCentroid();
+    celebrateStrokeComplete(x, y);
+    haptics?.liftEnd();
+  } else if (p.drew) {
+    haptics?.liftEnd();
+  }
+
   p.down = false;
   p.moved = false;
   pointers.delete(id);
@@ -779,6 +876,8 @@ function boot() {
   inkCapture.resize(viewSize().w, viewSize().h);
   preloadOcr();
   meteorSystem = createMeteorSystem();
+  haptics = createHaptics();
+  haptics.bindToggle(document.getElementById("chk-haptic"));
   resizeStars();
   resizeRippleCanvas();
   sim.multipleSplats(1);

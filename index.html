@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Nunito:wght@300;400;500&family=Shippori+Mincho:wght@400;500&family=Zen+Maru+Gothic:wght@300;400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=39" />
+  <link rel="stylesheet" href="styles.css?v=42" />
 </head>
 <body>
   <canvas id="fluid" aria-hidden="true"></canvas>
@@ -57,12 +57,18 @@
         <span class="stroke-slider-edge">長い</span>
       </div>
     </section>
+    <section class="settings-section">
+      <label class="settings-toggle" for="chk-haptic">
+        <span class="settings-toggle-label">振動</span>
+        <input type="checkbox" id="chk-haptic" checked aria-label="筆跡の振動をオンにする" />
+      </label>
+    </section>
     <p class="settings-foot" id="settings-foot">筆跡: 太さ・長さを調整</p>
   </aside>
 
   <div id="touch-layer" aria-hidden="true"></div>
   <div id="pos-toast" class="pos-toast" hidden aria-live="polite"></div>
 
-  <script type="module" src="js/main.js?v=39"></script>
+  <script type="module" src="js/main.js?v=42"></script>
 </body>
 </html>
