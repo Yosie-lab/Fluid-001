@@ -207,12 +207,9 @@ function spawnStrokeRipple(x, y) {
   createCosmicRipple(x, y, 26 + Math.random() * 12, 1.5 + Math.random() * 0.35, hue, 0.85, "stroke");
 }
 
-/** 指を離したときの波紋（指の位置に必ず出す） */
-function celebrateStrokeComplete(cx, cy) {
+/** 指を離したとき（波紋はいったん出さない） */
+function celebrateStrokeComplete(_cx, _cy) {
   bumpSkyLit(0.45);
-  const hue = rippleHue();
-  createCosmicRipple(cx, cy, 118, 1.35, hue, 0.82, "bless");
-  createCosmicRipple(cx, cy, 74, 1.75, hue, 0.58, "bless");
 }
 
 function spawnAmbientRipple() {
@@ -572,11 +569,13 @@ function onMove(id, clientX, clientY) {
     strokeSplat(x, y, p.color);
   }
 
-  // 一定距離ごとに1輪（書き始めの密集を防ぐ）
-  p.rippleDist += screenDist;
-  while (p.rippleDist >= STROKE_RIPPLE_STEP) {
-    p.rippleDist -= STROKE_RIPPLE_STEP;
-    spawnStrokeRipple(clientX, clientY);
+  // なぞり波紋はいったん無効（STROKE_RIPPLES_ENABLED）
+  if (STROKE_RIPPLES_ENABLED) {
+    p.rippleDist += screenDist;
+    while (p.rippleDist >= STROKE_RIPPLE_STEP) {
+      p.rippleDist -= STROKE_RIPPLE_STEP;
+      spawnStrokeRipple(clientX, clientY);
+    }
   }
 
   const angle = Math.atan2(dy, dx);
