@@ -200,9 +200,9 @@ function bumpSkyLit(amount = 0.2) {
 
 function spawnStrokeRipple(x, y) {
   const hue = rippleHue();
-  // はっきり見える小さめの二重波紋
-  createCosmicRipple(x, y, 48 + Math.random() * 22, 1.35 + Math.random() * 0.35, hue, 0.72, "stroke");
-  createCosmicRipple(x, y, 28 + Math.random() * 14, 1.7 + Math.random() * 0.4, hue, 0.45, "stroke");
+  // 見えるが少し控えめな二重波紋
+  createCosmicRipple(x, y, 48 + Math.random() * 22, 1.35 + Math.random() * 0.35, hue, 0.58, "stroke");
+  createCosmicRipple(x, y, 28 + Math.random() * 14, 1.7 + Math.random() * 0.4, hue, 0.34, "stroke");
   bumpSkyLit(0.08);
 }
 
@@ -278,16 +278,17 @@ function drawRipples() {
 
   for (const r of ripples) {
     const hue = r.hue || 195;
-    const isStroke = r.kind === "stroke" || r.kind === "bless";
-    const coreMul = isStroke ? 0.85 : 0.55;
-    const glowMul = isStroke ? 0.35 : 0.15;
-    const coreW = isStroke ? 4.2 : 3.2;
-    const glowW = isStroke ? 9.5 : 6.4;
+    const isStroke = r.kind === "stroke";
+    const isBless = r.kind === "bless";
+    const coreMul = isStroke ? 0.68 : isBless ? 0.85 : 0.55;
+    const glowMul = isStroke ? 0.26 : isBless ? 0.35 : 0.15;
+    const coreW = isStroke ? 3.6 : isBless ? 4.2 : 3.2;
+    const glowW = isStroke ? 8.0 : isBless ? 9.5 : 6.4;
 
-    if (isStroke && r.r < 10) {
+    if ((isStroke || isBless) && r.r < 10) {
       // 発生直後の芯を見せる
       const g = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, 12);
-      g.addColorStop(0, `hsla(${hue}, 85%, 88%, ${r.alpha * 0.55})`);
+      g.addColorStop(0, `hsla(${hue}, 85%, 88%, ${r.alpha * (isStroke ? 0.38 : 0.55)})`);
       g.addColorStop(1, `hsla(${hue}, 80%, 70%, 0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
