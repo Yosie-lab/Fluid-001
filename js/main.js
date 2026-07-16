@@ -200,8 +200,8 @@ function bumpSkyLit(amount = 0.2) {
 
 function spawnStrokeRipple(x, y) {
   const hue = rippleHue();
-  // 通常の宇宙波紋と同じ明るさ
-  createCosmicRipple(x, y, 44 + Math.random() * 18, 1.4 + Math.random() * 0.3, hue, 0.85, "stroke");
+  // 通常の宇宙波紋と同じ明るさ／広がりは小さめ
+  createCosmicRipple(x, y, 26 + Math.random() * 12, 1.5 + Math.random() * 0.35, hue, 0.85, "stroke");
   bumpSkyLit(0.05);
 }
 
