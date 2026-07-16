@@ -22,7 +22,7 @@ const STROKE_FADE_STOPS = [
   { densityDissipation: 0.9968, velocityDissipation: 0.9813 },
 ];
 
-const STROKE_STORAGE_KEY = "fluid-words-stroke-v3";
+const STROKE_STORAGE_KEY = "fluid-words-stroke-v4";
 const WIDTH_KEYS = ["splatRadius", "splatForce", "dyeGain", "moveForce", "step"];
 const FADE_KEYS = ["densityDissipation", "velocityDissipation"];
 
@@ -98,9 +98,9 @@ const paletteEl = document.getElementById("palette");
 const pointers = new Map();
 let sim;
 let activePalette = PALETTES[0];
-// デフォルト: 太さ 20% / 消える時間 80%
+// デフォルト: 太さ 20% / 消える時間 70%
 let widthT = 0.2;
-let fadeT = 0.8;
+let fadeT = 0.7;
 let activeStroke = composeStrokeFromSliders(widthT, fadeT);
 let stars = [];
 let last = performance.now();
@@ -118,7 +118,9 @@ let pendingResize = false;
 /** 0=暗い元の星空 → 1=文字があるときの明るさ */
 let skyLit = 0;
 
-/** なぞり波紋の間隔（px）— 最初に密集しないよう広め */
+/** なぞり波紋（いったん無効） */
+const STROKE_RIPPLES_ENABLED = false;
+/** なぞり波紋の間隔（px） */
 const STROKE_RIPPLE_STEP = 64;
 /** 曲がり角とみなす角度（ラジアン） */
 const STROKE_TURN_ANGLE = 0.72;
@@ -199,6 +201,7 @@ function bumpSkyLit(amount = 0.2) {
 }
 
 function spawnStrokeRipple(x, y) {
+  if (!STROKE_RIPPLES_ENABLED) return;
   const hue = rippleHue();
   // 通常波紋と同じ alpha。線幅は描画時にサイズ比例で合わせる
   createCosmicRipple(x, y, 26 + Math.random() * 12, 1.5 + Math.random() * 0.35, hue, 0.85, "stroke");
