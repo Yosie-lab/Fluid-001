@@ -118,8 +118,8 @@ let pendingResize = false;
 /** 0=暗い元の星空 → 1=文字があるときの明るさ */
 let skyLit = 0;
 
-/** なぞり波紋の間隔（px） */
-const STROKE_RIPPLE_STEP = 38;
+/** なぞり波紋の間隔（px）— 最初に密集しないよう広め */
+const STROKE_RIPPLE_STEP = 64;
 /** 曲がり角とみなす角度（ラジアン） */
 const STROKE_TURN_ANGLE = 0.72;
 /** 星空の基本の暗さ（0=真っ暗寄り, 1=従来）※最初・最後はこの明るさ */
@@ -200,28 +200,17 @@ function bumpSkyLit(amount = 0.2) {
 
 function spawnStrokeRipple(x, y) {
   const hue = rippleHue();
-  // 見えるが控えめな二重波紋
-  createCosmicRipple(x, y, 48 + Math.random() * 22, 1.35 + Math.random() * 0.35, hue, 0.50, "stroke");
-  createCosmicRipple(x, y, 28 + Math.random() * 14, 1.7 + Math.random() * 0.4, hue, 0.28, "stroke");
-  bumpSkyLit(0.08);
+  // なぞり中は1輪だけ（最初が密集しない）
+  createCosmicRipple(x, y, 44 + Math.random() * 18, 1.4 + Math.random() * 0.3, hue, 0.48, "stroke");
+  bumpSkyLit(0.05);
 }
 
-function spawnStrokeRipplesAlong(x0, y0, x1, y1) {
-  const dist = Math.hypot(x1 - x0, y1 - y0);
-  if (dist < 14) return;
-  const steps = Math.max(1, Math.floor(dist / STROKE_RIPPLE_STEP));
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    spawnStrokeRipple(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
-  }
-}
-
-/** 指を離したときのプチ祝福（流体は触らない＝文字を崩さない） */
+/** 指を離したときの波紋（指の位置に必ず出す） */
 function celebrateStrokeComplete(cx, cy) {
   bumpSkyLit(0.45);
   const hue = rippleHue();
-  createCosmicRipple(cx, cy, 110, 1.45, hue, 0.78, "bless");
-  createCosmicRipple(cx, cy, 68, 1.9, hue, 0.55, "bless");
+  createCosmicRipple(cx, cy, 118, 1.35, hue, 0.82, "bless");
+  createCosmicRipple(cx, cy, 74, 1.75, hue, 0.58, "bless");
 }
 
 function spawnAmbientRipple() {
@@ -524,6 +513,7 @@ function getPointer(id) {
       moved: false,
       lastAngle: null,
       drew: false,
+      rippleDist: 0,
       color: [1, 1, 1],
     };
     pointers.set(id, p);
@@ -542,6 +532,7 @@ function onDown(id, clientX, clientY) {
   p.down = true;
   p.moved = false;
   p.drew = false;
+  p.rippleDist = 0;
   p.x = uv.x;
   p.y = uv.y;
   p.clientX = clientX;
@@ -551,8 +542,8 @@ function onDown(id, clientX, clientY) {
   p.lastAngle = null;
   p.color = sim.nextColor();
   strokeSplat(p.x, p.y, p.color);
-  bumpSkyLit(0.25);
-  spawnStrokeRipple(clientX, clientY);
+  bumpSkyLit(0.2);
+  // 書き始めは波紋を出さない（直後のなぞりと重なって多すぎるため）
   haptics?.touchStart();
   touchLayer.classList.add("active");
 }
@@ -568,6 +559,7 @@ function onMove(id, clientX, clientY) {
 
   const prevClientX = p.clientX;
   const prevClientY = p.clientY;
+  const screenDist = Math.hypot(clientX - prevClientX, clientY - prevClientY);
 
   const step = activeStroke.step ?? 0.008;
   const steps = Math.max(1, Math.min(22, Math.ceil(dist / step)));
@@ -578,7 +570,12 @@ function onMove(id, clientX, clientY) {
     strokeSplat(x, y, p.color);
   }
 
-  spawnStrokeRipplesAlong(prevClientX, prevClientY, clientX, clientY);
+  // 一定距離ごとに1輪（書き始めの密集を防ぐ）
+  p.rippleDist += screenDist;
+  while (p.rippleDist >= STROKE_RIPPLE_STEP) {
+    p.rippleDist -= STROKE_RIPPLE_STEP;
+    spawnStrokeRipple(clientX, clientY);
+  }
 
   const angle = Math.atan2(dy, dx);
   if (p.lastAngle != null && dist > 0.006) {
@@ -607,13 +604,9 @@ function onUp(id) {
   const p = pointers.get(id);
   if (!p) return;
 
-  if (p.drew && inkCapture?.hasEnoughInk()) {
-    const { x, y } = inkCapture.getCentroid();
-    celebrateStrokeComplete(x, y);
-    haptics?.liftEnd();
-  } else if (p.drew) {
-    haptics?.liftEnd();
-  }
+  // 指を離した位置に必ず最後の波紋
+  celebrateStrokeComplete(p.clientX, p.clientY);
+  haptics?.liftEnd();
 
   p.down = false;
   p.moved = false;
