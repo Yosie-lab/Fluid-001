@@ -2,6 +2,7 @@ import { FluidSim } from "./fluid.js";
 import { findPositiveWord } from "./positive.js";
 import { InkCapture, recognizeInk, preloadOcr } from "./ink.js";
 import { createMeteorSystem } from "./meteors.js";
+import { createStrokeParticles } from "./particles.js";
 
 
 /** 太さの端点（超極細 → 中太）。スライダーで連続補間 */
@@ -112,6 +113,7 @@ let inkSessionActive = false;
 let analyzeTimer = null;
 let toastTimer = null;
 let meteorSystem = null;
+let strokeParticles = null;
 let pendingResize = false;
 
 function viewSize() {
@@ -446,7 +448,7 @@ function strokeSplat(x, y, dx, dy, color) {
 function getPointer(id) {
   let p = pointers.get(id);
   if (!p) {
-    p = { id, x: 0, y: 0, dx: 0, dy: 0, down: false, moved: false, color: [1, 1, 1] };
+    p = { id, x: 0, y: 0, clientX: 0, clientY: 0, dx: 0, dy: 0, down: false, moved: false, color: [1, 1, 1] };
     pointers.set(id, p);
   }
   return p;
@@ -464,11 +466,14 @@ function onDown(id, clientX, clientY) {
   p.moved = false;
   p.x = uv.x;
   p.y = uv.y;
+  p.clientX = clientX;
+  p.clientY = clientY;
   p.dx = 0;
   p.dy = 0;
   p.color = sim.nextColor();
   // 書き始めの点（拡散させない）
   strokeSplat(p.x, p.y, 0, 0, p.color);
+  strokeParticles?.spawn(clientX, clientY, p.color, 6);
   touchLayer.classList.add("active");
 }
 
@@ -489,12 +494,18 @@ function onMove(id, clientX, clientY) {
     const y = p.y + dy * t;
     strokeSplat(x, y, dx / steps, dy / steps, p.color);
   }
+  // 筆跡に沿ってパーティクルをまき散らす
+  const prevX = p.clientX ?? clientX;
+  const prevY = p.clientY ?? clientY;
+  strokeParticles?.spawnAlong(prevX, prevY, clientX, clientY, p.color, 1);
   recordInkPoint(clientX, clientY);
 
   p.dx = dx;
   p.dy = dy;
   p.x = uv.x;
   p.y = uv.y;
+  p.clientX = clientX;
+  p.clientY = clientY;
   p.moved = false;
 }
 
@@ -733,12 +744,15 @@ function frame(now) {
 
   updateRipples();
   meteorSystem?.update(now);
+  strokeParticles?.update(dt);
   // move中は onMove で直接 splat 済み。down状態の維持だけ。
   sim.update(dt);
   drawStars(now);
-  if (meteorSystem && starsCanvas) {
+  if (starsCanvas) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    meteorSystem.draw(starsCanvas.getContext("2d"), dpr);
+    const ctx = starsCanvas.getContext("2d");
+    meteorSystem?.draw(ctx, dpr);
+    strokeParticles?.draw(ctx, dpr);
   }
   drawRipples();
   requestAnimationFrame(frame);
@@ -779,6 +793,7 @@ function boot() {
   inkCapture.resize(viewSize().w, viewSize().h);
   preloadOcr();
   meteorSystem = createMeteorSystem();
+  strokeParticles = createStrokeParticles();
   resizeStars();
   resizeRippleCanvas();
   sim.multipleSplats(1);

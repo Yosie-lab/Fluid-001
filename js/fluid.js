@@ -358,19 +358,20 @@ vec3 energyParticles(vec2 uv, vec3 fluid, float dens, float cellPx, float sharpn
     if (i >= perCell) break;
     vec2 rnd = hash22(gid + i * 19.7);
     // 粗い粒は少なめ・細かい粒は多め
-    float spawnCut = mix(0.35, 0.08, clamp(8.0 / cellPx, 0.0, 1.0));
-    if (rnd.x > clamp(dens * 1.25 + spawnCut, 0.0, 0.98)) continue;
+    // 薄い筆跡でも粒が出やすいよう、密度が低くてもスポーン枠を残す
+    float spawnCut = mix(0.55, 0.18, clamp(8.0 / cellPx, 0.0, 1.0));
+    if (rnd.x > clamp(dens * 2.4 + spawnCut, 0.0, 0.99)) continue;
 
     vec2 center = mix(vec2(0.12), vec2(0.88), hash22(gid * 3.1 + i * 7.9));
     float d = length(f - center);
-    float gate = smoothstep(thresh, thresh + 0.18, dens * (0.5 + rnd.y * 0.75));
+    float gate = smoothstep(thresh * 0.55, thresh + 0.22, dens * (0.75 + rnd.y * 0.9));
     float core = exp(-d * d * sharpness) * gate;
     float halo = exp(-d * d * (sharpness * 0.16)) * gate * mix(0.7, 0.35, clamp(12.0 / cellPx, 0.0, 1.0));
     float twinkle = 0.55 + 0.45 * sin(uTime * (7.0 + rnd.y * 12.0) + rnd.x * 48.0 + i * 2.1);
 
-    spark += tint * core * twinkle * 2.6 * gain;
-    spark += tint * halo * gain;
-    spark += vec3(1.0, 0.95, 1.08) * (core * core * mix(3.2, 5.0, clamp(10.0 / cellPx, 0.0, 1.0)) * gain);
+    spark += tint * core * twinkle * 3.1 * gain;
+    spark += tint * halo * 1.15 * gain;
+    spark += vec3(1.0, 0.95, 1.08) * (core * core * mix(3.6, 5.6, clamp(10.0 / cellPx, 0.0, 1.0)) * gain);
   }
   return spark;
 }
