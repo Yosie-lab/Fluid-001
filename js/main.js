@@ -116,8 +116,8 @@ let meteorSystem = null;
 let haptics = null;
 let pendingResize = false;
 
-/** なぞり波紋の間隔（px） */
-const STROKE_RIPPLE_STEP = 34;
+/** なぞり波紋の間隔（px）— 控えめに */
+const STROKE_RIPPLE_STEP = 52;
 /** 曲がり角とみなす角度（ラジアン） */
 const STROKE_TURN_ANGLE = 0.72;
 
@@ -191,10 +191,10 @@ function spawnStrokeRipple(x, y) {
   createCosmicRipple(
     x,
     y,
-    34 + Math.random() * 26,
-    2.2 + Math.random() * 0.7,
+    28 + Math.random() * 18,
+    2.0 + Math.random() * 0.5,
     rippleHue(),
-    0.34 + Math.random() * 0.1
+    0.22 + Math.random() * 0.08
   );
 }
 
@@ -208,23 +208,10 @@ function spawnStrokeRipplesAlong(x0, y0, x1, y1) {
   }
 }
 
-/** 指を離したときのプチ祝福（OCRの前に届く） */
+/** 指を離したときのプチ祝福（流体は触らない＝文字を崩さない） */
 function celebrateStrokeComplete(cx, cy) {
-  addBonusStars(4 + Math.floor(Math.random() * 4));
-  createCosmicRipple(cx, cy, 88, 1.9, rippleHue(), 0.62);
-  createCosmicRipple(cx, cy, 52, 2.5, rippleHue(), 0.38);
-
-  if (!sim) return;
-  const { w, h } = viewSize();
-  const ux = Math.min(1, Math.max(0, cx / Math.max(1, w)));
-  const uy = 1 - Math.min(1, Math.max(0, cy / Math.max(1, h)));
-  const color = sim.nextColor();
-  sim.splat(ux, uy, 0, 0, color);
-  for (let i = 0; i < 2; i++) {
-    const ang = Math.random() * Math.PI * 2;
-    const force = 320 + Math.random() * 280;
-    sim.splat(ux, uy, Math.cos(ang) * force, Math.sin(ang) * force, color);
-  }
+  addBonusStars(3 + Math.floor(Math.random() * 3));
+  createCosmicRipple(cx, cy, 72, 1.7, rippleHue(), 0.48);
 }
 
 function spawnAmbientRipple() {
@@ -486,11 +473,9 @@ function isUiTarget(target) {
   );
 }
 
-function strokeSplat(x, y, dx, dy, color) {
-  // 線方向にごく弱い力＝文字が流れにくく、筆跡が残る
-  const force = sim.config.splatForce * (activeStroke.moveForce ?? 0.22);
-  // dyeGain は sim 側に反映済み。ここは力のみ。
-  sim.splat(x, y, dx * force, dy * force, color);
+function strokeSplat(x, y, color) {
+  // 筆跡は色だけ。速度を入れると文字が流れて崩れる
+  sim.splatDye(x, y, color);
 }
 
 function getPointer(id) {
@@ -534,7 +519,7 @@ function onDown(id, clientX, clientY) {
   p.dy = 0;
   p.lastAngle = null;
   p.color = sim.nextColor();
-  strokeSplat(p.x, p.y, 0, 0, p.color);
+  strokeSplat(p.x, p.y, p.color);
   spawnStrokeRipple(clientX, clientY);
   haptics?.touchStart();
   touchLayer.classList.add("active");
@@ -558,7 +543,7 @@ function onMove(id, clientX, clientY) {
     const t = i / steps;
     const x = p.x + dx * t;
     const y = p.y + dy * t;
-    strokeSplat(x, y, dx / steps, dy / steps, p.color);
+    strokeSplat(x, y, p.color);
   }
 
   spawnStrokeRipplesAlong(prevClientX, prevClientY, clientX, clientY);
@@ -643,7 +628,7 @@ function applyStrokeSettings({ flash = true, persist = true } = {}) {
   sim.config.velocityDissipation = activeStroke.velocityDissipation;
   sim.config.splatForce = activeStroke.splatForce;
   sim.config.dyeGain = activeStroke.dyeGain;
-  sim.config.curl = 3;
+  sim.config.curl = 0.4;
 
   const widthSlider = document.getElementById("stroke-width-slider");
   const fadeSlider = document.getElementById("stroke-fade-slider");
@@ -853,7 +838,7 @@ function boot() {
       densityDissipation: activeStroke.densityDissipation,
       velocityDissipation: activeStroke.velocityDissipation,
       dyeGain: activeStroke.dyeGain,
-      curl: 3,
+      curl: 0.4,
       pressure: 0.7,
       simResolution: 96,
       dyeResolution: 320,
