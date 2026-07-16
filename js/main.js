@@ -115,11 +115,17 @@ let toastTimer = null;
 let meteorSystem = null;
 let haptics = null;
 let pendingResize = false;
+/** 0=暗い元の星空 → 1=文字があるときの明るさ */
+let skyLit = 0;
 
-/** なぞり波紋の間隔（px）— 控えめに */
-const STROKE_RIPPLE_STEP = 52;
+/** なぞり波紋の間隔（px） */
+const STROKE_RIPPLE_STEP = 38;
 /** 曲がり角とみなす角度（ラジアン） */
 const STROKE_TURN_ANGLE = 0.72;
+/** 星空の基本の暗さ（0=真っ暗寄り, 1=従来） */
+const STAR_BASE_DIM = 0.55;
+/** 文字があるときの星の明るさ倍率 */
+const STAR_LIT_BOOST = 1.55;
 
 function viewSize() {
   const vv = window.visualViewport;
@@ -173,7 +179,7 @@ function installScrollLock() {
 // 脳リフレクソ同系統: 宇宙空間の広がる光の波紋
 const MAX_RIPPLES = 48;
 
-function createCosmicRipple(x, y, maxR, speed, hue, alpha) {
+function createCosmicRipple(x, y, maxR, speed, hue, alpha, kind = "ambient") {
   if (ripples.length >= MAX_RIPPLES) ripples.shift();
   ripples.push({
     x,
@@ -184,23 +190,25 @@ function createCosmicRipple(x, y, maxR, speed, hue, alpha) {
     baseAlpha: alpha !== undefined ? alpha : 0.8,
     alpha: alpha !== undefined ? alpha : 0.8,
     hue: hue !== undefined && hue !== null ? hue : 195,
+    kind,
   });
 }
 
+function bumpSkyLit(amount = 0.2) {
+  skyLit = Math.min(1, skyLit + amount);
+}
+
 function spawnStrokeRipple(x, y) {
-  createCosmicRipple(
-    x,
-    y,
-    28 + Math.random() * 18,
-    2.0 + Math.random() * 0.5,
-    rippleHue(),
-    0.22 + Math.random() * 0.08
-  );
+  const hue = rippleHue();
+  // はっきり見える小さめの二重波紋
+  createCosmicRipple(x, y, 48 + Math.random() * 22, 1.35 + Math.random() * 0.35, hue, 0.72, "stroke");
+  createCosmicRipple(x, y, 28 + Math.random() * 14, 1.7 + Math.random() * 0.4, hue, 0.45, "stroke");
+  bumpSkyLit(0.08);
 }
 
 function spawnStrokeRipplesAlong(x0, y0, x1, y1) {
   const dist = Math.hypot(x1 - x0, y1 - y0);
-  if (dist < 10) return;
+  if (dist < 14) return;
   const steps = Math.max(1, Math.floor(dist / STROKE_RIPPLE_STEP));
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
@@ -210,8 +218,10 @@ function spawnStrokeRipplesAlong(x0, y0, x1, y1) {
 
 /** 指を離したときのプチ祝福（流体は触らない＝文字を崩さない） */
 function celebrateStrokeComplete(cx, cy) {
-  addBonusStars(3 + Math.floor(Math.random() * 3));
-  createCosmicRipple(cx, cy, 72, 1.7, rippleHue(), 0.48);
+  bumpSkyLit(0.45);
+  const hue = rippleHue();
+  createCosmicRipple(cx, cy, 110, 1.45, hue, 0.78, "bless");
+  createCosmicRipple(cx, cy, 68, 1.9, hue, 0.55, "bless");
 }
 
 function spawnAmbientRipple() {
@@ -268,15 +278,31 @@ function drawRipples() {
 
   for (const r of ripples) {
     const hue = r.hue || 195;
-    // 脳リフレクソ同様: 本体リング + 外側グロー
-    ctx.strokeStyle = `hsla(${hue}, 70%, 75%, ${r.alpha * 0.55})`;
-    ctx.lineWidth = 3.2;
+    const isStroke = r.kind === "stroke" || r.kind === "bless";
+    const coreMul = isStroke ? 0.85 : 0.55;
+    const glowMul = isStroke ? 0.35 : 0.15;
+    const coreW = isStroke ? 4.2 : 3.2;
+    const glowW = isStroke ? 9.5 : 6.4;
+
+    if (isStroke && r.r < 10) {
+      // 発生直後の芯を見せる
+      const g = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, 12);
+      g.addColorStop(0, `hsla(${hue}, 85%, 88%, ${r.alpha * 0.55})`);
+      g.addColorStop(1, `hsla(${hue}, 80%, 70%, 0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = `hsla(${hue}, 78%, 78%, ${r.alpha * coreMul})`;
+    ctx.lineWidth = coreW;
     ctx.beginPath();
     ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.strokeStyle = `hsla(${hue}, 70%, 75%, ${r.alpha * 0.15})`;
-    ctx.lineWidth = 6.4;
+    ctx.strokeStyle = `hsla(${hue}, 75%, 75%, ${r.alpha * glowMul})`;
+    ctx.lineWidth = glowW;
     ctx.beginPath();
     ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
     ctx.stroke();
@@ -289,8 +315,9 @@ function makeStar(dpr) {
   return {
     x: Math.random(),
     y: Math.random(),
-    r: (0.4 + Math.random() * 1.4) * dpr,
-    a: Math.min(1, (0.2 + Math.random() * 0.7) * 1.2),
+    r: (0.35 + Math.random() * 1.15) * dpr,
+    // 元より暗めのベース
+    a: Math.min(1, (0.12 + Math.random() * 0.42) * STAR_BASE_DIM * 1.35),
     s: 0.004 + Math.random() * 0.01,
     p: Math.random() * Math.PI * 2,
   };
@@ -348,6 +375,7 @@ function showPositiveToast(word) {
 function celebratePositiveWord(word, cx, cy) {
   cosmosBoost = Math.min(12, cosmosBoost + 1);
   meteorSystem?.setBoost(cosmosBoost);
+  bumpSkyLit(1);
   addBonusStars(36 + cosmosBoost * 6);
 
   const meteorCount = 6 + Math.floor(cosmosBoost / 2);
@@ -444,10 +472,12 @@ function drawStars(t) {
   const w = starsCanvas.width;
   const h = starsCanvas.height;
   ctx.clearRect(0, 0, w, h);
+  // 文字があるときだけ明るく。消えると暗い元の星空へ
+  const lit = STAR_BASE_DIM + (STAR_LIT_BOOST - STAR_BASE_DIM) * skyLit;
   for (const star of stars) {
     star.p += star.s;
-    // 星本体を約1.2倍明るく（base a は makeStar 側で1.2倍済み）
-    const alpha = Math.min(1, Math.max(0.096, star.a + Math.sin(star.p + t * 0.001) * 0.3));
+    const twinkle = Math.sin(star.p + t * 0.001) * (0.14 + skyLit * 0.16);
+    const alpha = Math.min(1, Math.max(0.04, (star.a + twinkle) * lit));
     ctx.fillStyle = `rgba(230, 235, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(star.x * w, star.y * h, star.r, 0, Math.PI * 2);
@@ -520,6 +550,7 @@ function onDown(id, clientX, clientY) {
   p.lastAngle = null;
   p.color = sim.nextColor();
   strokeSplat(p.x, p.y, p.color);
+  bumpSkyLit(0.25);
   spawnStrokeRipple(clientX, clientY);
   haptics?.touchStart();
   touchLayer.classList.add("active");
@@ -811,6 +842,18 @@ function frame(now) {
       const bursts = 1 + Math.floor(cosmosBoost / 4);
       for (let i = 0; i < bursts; i++) spawnAmbientRipple();
     }
+  }
+
+  // 文字が残っている間は明るめ。消えるにつれて暗い星空へ戻す
+  const drawing = [...pointers.values()].some((p) => p.down);
+  if (drawing) {
+    bumpSkyLit(0.035);
+  } else {
+    // 筆跡の消え方に合わせてゆっくり戻す（長い設定ほどゆっくり）
+    const fadeHold = 0.35 + fadeT * 1.4;
+    const decay = 1 - Math.min(0.9, dt / fadeHold);
+    skyLit *= decay;
+    if (skyLit < 0.01) skyLit = 0;
   }
 
   updateRipples();
