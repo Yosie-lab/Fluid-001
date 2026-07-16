@@ -122,10 +122,10 @@ let skyLit = 0;
 const STROKE_RIPPLE_STEP = 38;
 /** 曲がり角とみなす角度（ラジアン） */
 const STROKE_TURN_ANGLE = 0.72;
-/** 星空の基本の暗さ（0=真っ暗寄り, 1=従来） */
-const STAR_BASE_DIM = 0.55;
+/** 星空の基本の暗さ（0=真っ暗寄り, 1=従来）※最初・最後はこの明るさ */
+const STAR_BASE_DIM = 0.82;
 /** 文字があるときの星の明るさ倍率 */
-const STAR_LIT_BOOST = 1.55;
+const STAR_LIT_BOOST = 1.35;
 
 function viewSize() {
   const vv = window.visualViewport;
@@ -315,9 +315,9 @@ function makeStar(dpr) {
   return {
     x: Math.random(),
     y: Math.random(),
-    r: (0.35 + Math.random() * 1.15) * dpr,
-    // 元より暗めのベース
-    a: Math.min(1, (0.12 + Math.random() * 0.42) * STAR_BASE_DIM * 1.35),
+    r: (0.38 + Math.random() * 1.25) * dpr,
+    // やや暗めだが最初・最後でも見える明るさ
+    a: Math.min(1, (0.18 + Math.random() * 0.55) * 0.95),
     s: 0.004 + Math.random() * 0.01,
     p: Math.random() * Math.PI * 2,
   };
@@ -476,8 +476,8 @@ function drawStars(t) {
   const lit = STAR_BASE_DIM + (STAR_LIT_BOOST - STAR_BASE_DIM) * skyLit;
   for (const star of stars) {
     star.p += star.s;
-    const twinkle = Math.sin(star.p + t * 0.001) * (0.14 + skyLit * 0.16);
-    const alpha = Math.min(1, Math.max(0.04, (star.a + twinkle) * lit));
+    const twinkle = Math.sin(star.p + t * 0.001) * (0.18 + skyLit * 0.14);
+    const alpha = Math.min(1, Math.max(0.07, (star.a + twinkle) * lit));
     ctx.fillStyle = `rgba(230, 235, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(star.x * w, star.y * h, star.r, 0, Math.PI * 2);
