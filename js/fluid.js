@@ -612,21 +612,6 @@ void main () {
     this.dye.swap();
   }
 
-  /** 筆跡用：色だけ置き、速度は入れない（文字が流れ・崩れない） */
-  splatDye(x, y, color) {
-    const gl = this.gl;
-    const { splat } = this.programs;
-    gl.useProgram(splat.program);
-    gl.uniform1i(splat.uniforms.uTarget, this.dye.read.attach(0));
-    gl.uniform1f(splat.uniforms.aspectRatio, this.canvas.width / this.canvas.height);
-    gl.uniform2f(splat.uniforms.point, x, y);
-    const g = this.config.dyeGain ?? 0.18;
-    gl.uniform3f(splat.uniforms.color, color[0] * g, color[1] * g, color[2] * g);
-    gl.uniform1f(splat.uniforms.radius, this._correctRadius(this.config.splatRadius / 100));
-    this._blit(this.dye.write);
-    this.dye.swap();
-  }
-
   _correctRadius(radius) {
     const aspect = this.canvas.width / this.canvas.height;
     if (aspect > 1) radius *= aspect;

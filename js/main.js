@@ -474,8 +474,8 @@ function isUiTarget(target) {
 }
 
 function strokeSplat(x, y, color) {
-  // 筆跡は色だけ。速度を入れると文字が流れて崩れる
-  sim.splatDye(x, y, color);
+  // 速度 0 で色だけ置く（動かすと文字が崩れる／色パスを飛ばすと見えない）
+  sim.splat(x, y, 0, 0, color);
 }
 
 function getPointer(id) {
